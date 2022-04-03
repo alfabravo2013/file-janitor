@@ -13,6 +13,10 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/File Janitor/stage1" />
+            <option value="$PROJECT_DIR$/File Janitor/stage2" />
+            <option value="$PROJECT_DIR$/File Janitor/stage3" />
+            <option value="$PROJECT_DIR$/File Janitor/stage4" />
+            <option value="$PROJECT_DIR$/File Janitor/stage5" />
             <option value="$PROJECT_DIR$/util" />
           </set>
         </option>

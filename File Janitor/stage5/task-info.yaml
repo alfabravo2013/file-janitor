@@ -1,0 +1,6 @@
+type: edu
+files:
+- name: main.sh
+  visible: true
+- name: test/FileJanitorStage5Test.java
+  visible: false
