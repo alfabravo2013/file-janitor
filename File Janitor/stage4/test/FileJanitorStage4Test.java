@@ -1,7 +1,7 @@
 import org.junit.Assert;
 import org.junit.Test;
 
-public class Tests {
+public class FileJanitorStage4Test {
   @Test
   public void testSolution() {
     // put your test here
