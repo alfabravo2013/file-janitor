@@ -31,8 +31,8 @@ public class FileJanitorStage3Test extends StageTest<Object> {
             Usage: file-janitor.sh [option] <file_path>
 
                 options:
-                    help        displays this help file
-                    list [path] lists files in the specified or working directory
+                    help            displays this help file
+                    list [path]     lists files in the specified or working directory
             """;
     private final Map<String, String> helpFile = Map.of(filename, helpFileContent);
 
@@ -43,13 +43,15 @@ public class FileJanitorStage3Test extends StageTest<Object> {
     private final String notDirectoryName = "not-a-dir";
     private final Map<String, String> notDirectory = Map.of(notDirectoryName, "");
     private final String[] currentDir = {"", "."};
-    private final String[] pathsToList = {"../", "../../", "../../../"};
+    private final String[] pathsToList = {"../", "../../", "../../../", "test"};
     private final Map<String, String> filesToList = Map.of(
             "file1", "",
             "file2", "",
             ".file1", "",
             "file-1", "",
-            "File1", ""
+            "File1", "",
+            "file.extension", "",
+            "test/.tricky.Name", ""
     );
 
     private final String currentDirMessage = "Listing files in the current directory";
@@ -194,14 +196,14 @@ public class FileJanitorStage3Test extends StageTest<Object> {
         }
 
         if (lines.stream().noneMatch(line -> expected.equalsIgnoreCase(line.strip()))) {
-            return CheckResult.wrong("If listing at a path that refers to a file instead of a directory, " +
+            return CheckResult.wrong("If listing at a path that does not refer to a directory, " +
                     "your script must print that that path is not a directory");
         }
 
         return CheckResult.correct();
     }
 
-    @DynamicTest(order = 7, data = "pathsToList")
+    @DynamicTest(order = 7, data = "pathsToList", files = "filesToList")
     CheckResult testListFilesAtPath(String path) {
         TestedProgram program = new TestedProgram();
 

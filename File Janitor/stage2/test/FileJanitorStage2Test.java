@@ -24,16 +24,16 @@ public class FileJanitorStage2Test extends StageTest<Object> {
 
     private final String filename = "file-janitor-help.txt";
     private final String helpFileContent = """
-                                              File Janitor is a tool to discover files and clean directories
+            File Janitor is a tool to discover files and clean directories
 
-                                              Usage: file-janitor.sh [option] <file_path>
+            Usage: file-janitor.sh [option] <file_path>
 
-                                                  options:
-                                                      help        displays this help file
-                                              """;
+                options:
+                    help            displays this help file
+            """;
     private final Map<String, String> helpFile = Map.of(filename, helpFileContent);
 
-    private final String[] unsupportedArgs = { "unknown", "-h", "unsupported", "arg1"};
+    private final String[] unsupportedArgs = {"unknown", "-h", "unsupported", "arg1"};
 
     @DynamicTest(order = 1)
     CheckResult testScriptTitle() {
@@ -52,7 +52,7 @@ public class FileJanitorStage2Test extends StageTest<Object> {
     @DynamicTest(order = 2, files = "helpFile")
     CheckResult testHelp() throws IOException {
         TestedProgram program = new TestedProgram();
-        
+
         List<String> fileContent = Files.readAllLines(Path.of(filename));
         String output = program.start("help");
 
