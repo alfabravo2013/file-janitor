@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
@@ -42,7 +43,7 @@ public class FileJanitorStage4Test extends StageTest<Object> {
 
     private final String noArgsHint = "Type file-janitor.sh help to see available options";
 
-    private final String notDirectoryName = "not-a-dir";
+    private final String notDirectoryName = UUID.randomUUID().toString();
     private final Map<String, String> notDirectory = Map.of(notDirectoryName, "");
     private final String[] currentDir = {"", "."};
     private final String[] pathsToList = {"../", "../../", "../../../", "test"};
@@ -257,7 +258,7 @@ public class FileJanitorStage4Test extends StageTest<Object> {
         return checkFileReport(fileReport, path);
     }
 
-    @DynamicTest(order = 8, data = "pathsToList", files = "getFilesToReport")
+    @DynamicTest(order = 9, data = "pathsToList", files = "getFilesToReport")
     CheckResult checkReportFilesAtPath(String path) {
         TestedProgram program = new TestedProgram();
 
@@ -284,7 +285,7 @@ public class FileJanitorStage4Test extends StageTest<Object> {
         return checkFileReport(fileReport, path);
     }
 
-    @DynamicTest(order = 9, files = "getFilesToReport")
+    @DynamicTest(order = 10, files = "getFilesToReport")
     CheckResult checkReportFilesAtNonExistingPath() {
         TestedProgram program = new TestedProgram();
 
@@ -306,7 +307,7 @@ public class FileJanitorStage4Test extends StageTest<Object> {
         return CheckResult.correct();
     }
 
-    @DynamicTest(order = 10, files = "notDirectory")
+    @DynamicTest(order = 11, files = "notDirectory")
     CheckResult checkReportFilesAtNotDirectory() {
         TestedProgram program = new TestedProgram();
 
@@ -388,12 +389,16 @@ public class FileJanitorStage4Test extends StageTest<Object> {
     }
 
     private CheckResult checkFileReport(List<String> report, String path) {
-        long tmpActualSize = getFileSizeAndCount(path, "tmp").get("size");
-        long tmpActualCount = getFileSizeAndCount(path, "tmp").get("count");
-        long logActualSize = getFileSizeAndCount(path, "log").get("size");
-        long logActualCount = getFileSizeAndCount(path, "log").get("count");
-        long pyActualSize = getFileSizeAndCount(path, "py").get("size");
-        long pyActualCount = getFileSizeAndCount(path, "py").get("count");
+        Map<String, Long> actualTmp = getFileSizeAndCount(path, "tmp");
+        Map<String, Long> actualLog = getFileSizeAndCount(path, "log");
+        Map<String, Long> actualPy = getFileSizeAndCount(path, "py");
+
+        long tmpActualSize = actualTmp.get("size");
+        long tmpActualCount = actualTmp.get("count");
+        long logActualSize = actualLog.get("size");
+        long logActualCount = actualLog.get("count");
+        long pyActualSize = actualPy.get("size");
+        long pyActualCount = actualPy.get("count");
 
         Pattern tmpPattern = Pattern.compile(String.format(reportLineFormat, tmpActualCount, "tmp", tmpActualSize));
         Pattern logPattern = Pattern.compile(String.format(reportLineFormat, logActualCount, "log", logActualSize));
@@ -460,8 +465,8 @@ public class FileJanitorStage4Test extends StageTest<Object> {
     }
 
     private String getRandomFileContent() {
-        ThreadLocalRandom rnd = ThreadLocalRandom.current();
-        return rnd.ints().limit(rnd.nextInt(25, 125))
+        Random rnd = ThreadLocalRandom.current();
+        return rnd.ints().limit(rnd.nextInt(25, 1250))
                 .mapToObj(String::valueOf)
                 .collect(Collectors.joining());
 

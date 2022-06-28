@@ -40,7 +40,7 @@ public class FileJanitorStage3Test extends StageTest<Object> {
 
     private final String noArgsHint = "Type file-janitor.sh help to see available options";
 
-    private final String notDirectoryName = "not-a-dir";
+    private final String notDirectoryName = UUID.randomUUID().toString();
     private final Map<String, String> notDirectory = Map.of(notDirectoryName, "");
     private final String[] currentDir = {"", "."};
     private final String[] pathsToList = {"../", "../../", "../../../", "test"};
