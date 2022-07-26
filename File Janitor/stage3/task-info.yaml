@@ -1,6 +1,4 @@
 type: edu
 files:
-- name: file-janitor.sh
-  visible: true
 - name: test/FileJanitorStage3Test.java
   visible: false

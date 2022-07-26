@@ -54,7 +54,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private final String notDirectoryName = UUID.randomUUID().toString();
     private final Map<String, String> notDirectory = Map.of(notDirectoryName, "");
-    private final String[] currentDir = {"", "."};
+    private final String[] currentDir = {""};
     private final String[] pathsToList = {"../", "../../", "../../../", "test"};
     private final Map<String, String> filesToList = Map.of(
             "file1", "",
@@ -76,8 +76,11 @@ public class FileJanitorStage5Test extends StageTest<Object> {
     private final String someDirReportMsg = " contains:";
 
     private final String currentDirCleanMsg = "Cleaning the current directory...";
+    private final String someDirCleanMsg = "Cleaning %s...";
     private final String currentDirCleanDone = "Clean up of the current directory is complete!";
+    private final String someDirCleanDone = "Clean up of %s is complete!";
     private final String cleanLineFormat = "(?).+ done! %d files have been %s";
+    private final String[] pathsToClean = { "./", "./test" };
 
     @DynamicTest(order = 1)
     CheckResult testScriptTitle() {
@@ -298,7 +301,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
         return checkFileReport(fileReport, path);
     }
 
-    @DynamicTest(order = 10, files = "getFilesToReport")
+    @DynamicTest(order = 10)
     CheckResult checkReportFilesAtNonExistingPath() {
         TestedProgram program = new TestedProgram();
 
@@ -341,7 +344,6 @@ public class FileJanitorStage5Test extends StageTest<Object> {
         return CheckResult.correct();
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     @DynamicTest(order = 12, data = "currentDir", files = "getFilesToReport")
     CheckResult checkCleanFilesAtCurrentDir(String path) {
         TestedProgram program = new TestedProgram();
@@ -363,22 +365,130 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
         var checkResult = checkCleanReport(cleanReport, path);
 
-        Path scriptsDir = Path.of("./py_scripts");
-        Path logArch = Path.of("logs.tar.gz");
-        try (Stream<Path> walk = Files.walk(scriptsDir)) {
-            walk.map(Path::toFile).forEach(File::delete);
-            logArch.toFile().delete();
-            scriptsDir.toFile().delete();
-        } catch (IOException e) {
-            System.err.println("Failed to delete user generated files");
-        }
+        deleteUserGenFiles("./py_scripts", "logs.tar.gz");
 
         return checkResult;
     }
 
-    // todo check if all the above works for an arbitrary dir
-    // todo check if an error is displayed for a missing dir and for a not a dir
-    // TODO: 7/26/22 check if script does not create /py_scripts dir when there is no py files
+    @DynamicTest(order = 13, data = "pathsToClean", files = "getFilesToReport")
+    CheckResult checkCleanFilesAtAtPath(String path) {
+        TestedProgram program = new TestedProgram();
+
+        String output = program.start("clean", path);
+        List<String> lines = expect(output).toContainAtLeast(7).lines();
+
+        if (lines.stream().noneMatch(line -> someDirCleanMsg.formatted(path).equalsIgnoreCase(line.strip()))) {
+            return CheckResult.wrong("When reporting files in the current directory, " +
+                    "your script must print this line: " + someDirCleanMsg.formatted(path));
+        }
+
+        List<String> cleanReport = lines.stream()
+                .dropWhile(line -> !someDirCleanMsg.formatted(path).equalsIgnoreCase(line.strip()))
+                .skip(1)
+                .filter(line -> !line.isBlank())
+                .takeWhile(it -> !someDirCleanDone.formatted(path).equalsIgnoreCase(it))
+                .collect(Collectors.toList());
+
+        var checkResult = checkCleanReport(cleanReport, path);
+
+        deleteUserGenFiles(path + "/py_scripts", path + "/logs.tar.gz");
+
+        return checkResult;
+    }
+
+    @DynamicTest(order = 14)
+    CheckResult checkCleanFilesAtNonExistingPath() {
+        TestedProgram program = new TestedProgram();
+
+        String nonExistingPath = UUID.randomUUID().toString();
+        String expected = nonExistingPath + pathNotFoundMessage;
+        String output = program.start("clean", nonExistingPath);
+        List<String> lines = expect(output).toContainAtLeast(3).lines();
+
+        CheckResult checkInfoResult = checkInfo(lines);
+        if (!checkInfoResult.isCorrect()) {
+            return checkInfoResult;
+        }
+
+        if (lines.stream().noneMatch(line -> expected.equalsIgnoreCase(line.strip()))) {
+            return CheckResult.wrong("When cleaning files in a non-existing directory, " +
+                    "your script must print that such directory is not found");
+        }
+
+        return CheckResult.correct();
+    }
+
+    @DynamicTest(order = 15, files = "notDirectory")
+    CheckResult checkCleanFilesAtNotDirectory() {
+        TestedProgram program = new TestedProgram();
+
+        String expected = notDirectoryName + notDirectoryMessage;
+        String output = program.start("clean", notDirectoryName);
+        List<String> lines = expect(output).toContainAtLeast(3).lines();
+
+        CheckResult checkInfoResult = checkInfo(lines);
+        if (!checkInfoResult.isCorrect()) {
+            return checkInfoResult;
+        }
+
+        if (lines.stream().noneMatch(line -> expected.equalsIgnoreCase(line.strip()))) {
+            return CheckResult.wrong("If cleaning at a path that does not refer to a directory, " +
+                    "your script must print that that path is not a directory");
+        }
+
+        return CheckResult.correct();
+    }
+
+    @DynamicTest(order = 16)
+    CheckResult checkCleanFilesNoFiles() {
+        TestedProgram program = new TestedProgram();
+
+        String output = program.start("clean");
+        List<String> lines = expect(output).toContainAtLeast(7).lines();
+
+        if (lines.stream().noneMatch(line -> currentDirCleanMsg.equalsIgnoreCase(line.strip()))) {
+            return CheckResult.wrong("When reporting files in the current directory, " +
+                    "your script must print this line: " + currentDirCleanMsg);
+        }
+
+        List<String> cleanReport = lines.stream()
+                .dropWhile(line -> !currentDirCleanMsg.equalsIgnoreCase(line.strip()))
+                .skip(1)
+                .filter(line -> !line.isBlank())
+                .takeWhile(it -> !currentDirCleanMsg.equalsIgnoreCase(it))
+                .collect(Collectors.toList());
+
+        var expectedCount = 0;
+
+        var tmpPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "removed"));
+        var isTmpReportOk = cleanReport.stream().anyMatch(line -> tmpPattern.matcher(line).matches());
+        if (!isTmpReportOk) {
+            return CheckResult.wrong("Your script did not output expected information about " +
+                    "removing *.tmp files at the current dir");
+        }
+
+        var logPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "compressed"));
+        var isLogReportOk = cleanReport.stream().anyMatch(line -> logPattern.matcher(line).matches());
+        if (!isLogReportOk) {
+            return CheckResult.wrong("Your script did not output expected information about " +
+                    "compressing *.log files at the current dir");
+        }
+
+        var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
+        var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
+        if (!isPyReportOk) {
+            return CheckResult.wrong("Your script did not output expected information about " +
+                    "moving *.py files at the current dir");
+        }
+
+        if (Files.exists(Path.of("./py_scripts"))) {
+            return CheckResult.wrong(
+                    "Your script must not create py_scripts directory if no *.py files were moved"
+            );
+        }
+
+        return CheckResult.correct();
+    }
 
     private CheckResult checkCleanReport(List<String> cleanReport, String path) {
         var tmpCheckResult = isTmpCleanReportOk(cleanReport, path);
@@ -408,59 +518,64 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                         "directory, but " + tmpActualCount + " files were found");
             }
 
-            var expectedCount = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "tmp").size();
+            var expectedCount = getFilenamesByExtExclPath(path, "tmp").size();
             var tmpPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "removed"));
             var isTmpReportOk = cleanReport.stream().anyMatch(line -> tmpPattern.matcher(line).matches());
 
             return isTmpReportOk ?
                     CheckResult.correct() :
                     CheckResult.wrong("Your script did not output expected information about " +
-                            "removing *.tmp files at " + path);
+                            "removing *.tmp files at " + path + ". Expected: " + cleanLineFormat.formatted(expectedCount, "removed"));
         } catch (Exception e) {
             return CheckResult.wrong("An error happened during the test: " + e.getMessage());
         }
     }
 
     private CheckResult isLogCleanReportOk(List<String> cleanReport, String path) {
-        var actualLog = getFileSizeAndCount(path, "log");
-        var logActualCount = actualLog.get("count");
-        if (logActualCount != 0L) {
-            return CheckResult.wrong("There must not be *.log files in the " + path +
-                    "directory, but " + logActualCount + " files were found");
-        }
-
-        var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
-        var logFiles = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log");
-
-        try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(archFilename));
-             TarArchiveInputStream tais = new TarArchiveInputStream(gzis)) {
-            ArchiveEntry entry;
-            List<String> compressedFiles = new ArrayList<>();
-
-            while ((entry = tais.getNextEntry()) != null) {
-                var entryName = entry.getName().replaceFirst("\\./", "");
-                compressedFiles.add(entryName);
+        try {
+            var actualLog = getFileSizeAndCount(path, "log");
+            var logActualCount = actualLog.get("count");
+            if (logActualCount != 0L) {
+                return CheckResult.wrong("There must not be *.log files in the " + path +
+                        "directory, but " + logActualCount + " files were found");
             }
 
-            if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
-                return CheckResult.wrong("Expected " + logFiles + " but found " + compressedFiles);
+            var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
+            var logFiles = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log");
+
+            try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(archFilename));
+                 TarArchiveInputStream tais = new TarArchiveInputStream(gzis)) {
+                ArchiveEntry entry;
+                List<String> compressedFiles = new ArrayList<>();
+
+                while ((entry = tais.getNextEntry()) != null) {
+                    var entryName = entry.getName().replaceFirst("\\./", "");
+                    compressedFiles.add(entryName);
+                }
+
+                if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
+                    return CheckResult.wrong("Expected " + logFiles + " but found " + compressedFiles);
+                }
+
+                var expectedCount = getFilenamesByExtExclPath(path, "log").size();
+                var logPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "compressed"));
+                var isLogReportOk = cleanReport.stream().anyMatch(line -> logPattern.matcher(line).matches());
+
+                return isLogReportOk ?
+                        CheckResult.correct() :
+                        CheckResult.wrong("Your script did not output expected information about " +
+                                "compressing *.log files at " + path);
+            } catch (IOException e) {
+                return CheckResult.wrong("Error happened during testing: " + e.getMessage());
             }
-
-            var expectedCount = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log").size();
-            var logPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "compressed"));
-            var isLogReportOk = cleanReport.stream().anyMatch(line -> logPattern.matcher(line).matches());
-
-            return isLogReportOk ?
-                    CheckResult.correct() :
-                    CheckResult.wrong("Your script did not output expected information about " +
-                            "removing *.tmp files at " + path);
-        } catch (IOException e) {
+        } catch (Exception e) {
             return CheckResult.wrong("Error happened during testing: " + e.getMessage());
         }
     }
 
     private CheckResult isPyCleanReportOk(List<String> cleanReport, String path) {
-        var scriptsDir = path.isBlank() ? "." + "/py_scripts" : path + "/py_scripts";
+        try {
+        var scriptsDir = path.isBlank() ? "./py_scripts" : path + "/py_scripts";
         var scriptsPath = Paths.get(scriptsDir);
         if (!Files.exists(scriptsPath)) {
             return CheckResult.wrong(scriptsDir + " is not found");
@@ -468,11 +583,40 @@ public class FileJanitorStage5Test extends StageTest<Object> {
             return CheckResult.wrong(scriptsDir + "is not a directory");
         }
 
-        var actualPy = getFileSizeAndCount(scriptsDir, "py");
-        var actualPyCount = actualPy.get("count");
+        var pyActualCountAtSourcePath = getFileSizeAndCount(path, "py").get("count");
+        if (pyActualCountAtSourcePath != 0L) {
+            return CheckResult.wrong("Your script didn't move all *.py files to " + scriptsDir);
+        }
 
-        // todo check if py files are moved to a sub-dir
-        return CheckResult.correct();
+        var pyActualCountAtTargetPath = getFileSizeAndCount(scriptsDir, "py").get("count");
+        var expectedCount = getFilenamesByExtExclPath(path, "py").size();
+        if (pyActualCountAtTargetPath != (long) expectedCount) {
+            return CheckResult.wrong("Not all *.py files are present in " + scriptsDir);
+        }
+
+        var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
+        var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
+
+        return isPyReportOk ?
+                CheckResult.correct() :
+                CheckResult.wrong("Your script did not output expected information about " +
+                        "moving *.py files at " + path);
+        } catch (Exception e) {
+            return CheckResult.wrong("Error happened during testing: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private void deleteUserGenFiles(String scriptsDir, String logArch) {
+        Path scriptsPath = Path.of(scriptsDir);
+        Path logPath = Path.of(logArch);
+        try (Stream<Path> walk = Files.walk(scriptsPath)) {
+            walk.map(Path::toFile).forEach(File::delete);
+            logPath.toFile().delete();
+            scriptsPath.toFile().delete();
+        } catch (IOException e) {
+            System.err.println("Failed to delete user generated files");
+        }
     }
 
     private CheckResult checkInfo(List<String> infoLines) {
@@ -615,7 +759,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
     private List<String> getFilenamesByExtExclPath(String path, String extension) {
         return getFilenamesToReport().stream()
                 .filter(it -> {
-                    if (path.isBlank()) {
+                    if (path.isBlank() || "./".equals(path)) {
                         return !it.startsWith("test/");
                     } else {
                         return it.startsWith("test/");

@@ -45,7 +45,7 @@ public class FileJanitorStage4Test extends StageTest<Object> {
 
     private final String notDirectoryName = UUID.randomUUID().toString();
     private final Map<String, String> notDirectory = Map.of(notDirectoryName, "");
-    private final String[] currentDir = {"", "."};
+    private final String[] currentDir = {""};
     private final String[] pathsToList = {"../", "../../", "../../../", "test"};
     private final Map<String, String> filesToList = Map.of(
             "file1", "",
