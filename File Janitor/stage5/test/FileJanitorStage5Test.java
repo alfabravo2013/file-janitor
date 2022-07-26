@@ -5,6 +5,7 @@ import org.hyperskill.hstest.stage.StageTest;
 import org.hyperskill.hstest.testcase.CheckResult;
 import org.hyperskill.hstest.testing.TestedProgram;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -76,6 +77,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private final String currentDirCleanMsg = "Cleaning the current directory...";
     private final String currentDirCleanDone = "Clean up of the current directory is complete!";
+    private final String cleanLineFormat = "(?).+ done! %d files have been %s";
 
     @DynamicTest(order = 1)
     CheckResult testScriptTitle() {
@@ -339,7 +341,8 @@ public class FileJanitorStage5Test extends StageTest<Object> {
         return CheckResult.correct();
     }
 
-    @DynamicTest(order = 8, data = "currentDir", files = "getFilesToReport")
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @DynamicTest(order = 12, data = "currentDir", files = "getFilesToReport")
     CheckResult checkCleanFilesAtCurrentDir(String path) {
         TestedProgram program = new TestedProgram();
 
@@ -358,26 +361,72 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .takeWhile(it -> !currentDirCleanDone.equalsIgnoreCase(it))
                 .collect(Collectors.toList());
 
-        return checkCleanReport(cleanReport, path); // todo remove py scripts with their dir and tarball
-    }
+        var checkResult = checkCleanReport(cleanReport, path);
 
-    // todo check if all the above works for the pwd
-    // todo check if all the above works for an arbitrary dir
-    // todo check if an error is displayed for a missing dir and for a not a dir
-
-    private CheckResult checkCleanReport(List<String> cleanReport, String path) {
-        var actualTmp = getFileSizeAndCount(path, "tmp");
-        var actualTmpCount = actualTmp.get("count");
-        if (actualTmpCount != 0L) {
-            return CheckResult.wrong("There must not be *.tmp files in the " + path +
-                    "directory, but " + actualTmpCount + " files were found");
+        Path scriptsDir = Path.of("./py_scripts");
+        Path logArch = Path.of("logs.tar.gz");
+        try (Stream<Path> walk = Files.walk(scriptsDir)) {
+            walk.map(Path::toFile).forEach(File::delete);
+            logArch.toFile().delete();
+            scriptsDir.toFile().delete();
+        } catch (IOException e) {
+            System.err.println("Failed to delete user generated files");
         }
 
+        return checkResult;
+    }
+
+    // todo check if all the above works for an arbitrary dir
+    // todo check if an error is displayed for a missing dir and for a not a dir
+    // TODO: 7/26/22 check if script does not create /py_scripts dir when there is no py files
+
+    private CheckResult checkCleanReport(List<String> cleanReport, String path) {
+        var tmpCheckResult = isTmpCleanReportOk(cleanReport, path);
+        if (!tmpCheckResult.isCorrect()) {
+            return tmpCheckResult;
+        }
+
+        var logCheckResult = isLogCleanReportOk(cleanReport, path);
+        if (!logCheckResult.isCorrect()) {
+            return logCheckResult;
+        }
+
+        var pyCheckResult = isPyCleanReportOk(cleanReport, path);
+        if (!pyCheckResult.isCorrect()) {
+            return pyCheckResult;
+        }
+
+        return CheckResult.correct();
+    }
+
+    private CheckResult isTmpCleanReportOk(List<String> cleanReport, String path) {
+        try {
+            var actualTmp = getFileSizeAndCount(path, "tmp");
+            var tmpActualCount = actualTmp.get("count");
+            if (tmpActualCount != 0L) {
+                return CheckResult.wrong("There must not be *.tmp files in the " + path +
+                        "directory, but " + tmpActualCount + " files were found");
+            }
+
+            var expectedCount = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "tmp").size();
+            var tmpPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "removed"));
+            var isTmpReportOk = cleanReport.stream().anyMatch(line -> tmpPattern.matcher(line).matches());
+
+            return isTmpReportOk ?
+                    CheckResult.correct() :
+                    CheckResult.wrong("Your script did not output expected information about " +
+                            "removing *.tmp files at " + path);
+        } catch (Exception e) {
+            return CheckResult.wrong("An error happened during the test: " + e.getMessage());
+        }
+    }
+
+    private CheckResult isLogCleanReportOk(List<String> cleanReport, String path) {
         var actualLog = getFileSizeAndCount(path, "log");
-        var actualLogCount = actualLog.get("count");
-        if (actualLogCount != 0L) {
+        var logActualCount = actualLog.get("count");
+        if (logActualCount != 0L) {
             return CheckResult.wrong("There must not be *.log files in the " + path +
-                    "directory, but " + actualLogCount + " files were found");
+                    "directory, but " + logActualCount + " files were found");
         }
 
         var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
@@ -396,10 +445,21 @@ public class FileJanitorStage5Test extends StageTest<Object> {
             if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
                 return CheckResult.wrong("Expected " + logFiles + " but found " + compressedFiles);
             }
+
+            var expectedCount = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log").size();
+            var logPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "compressed"));
+            var isLogReportOk = cleanReport.stream().anyMatch(line -> logPattern.matcher(line).matches());
+
+            return isLogReportOk ?
+                    CheckResult.correct() :
+                    CheckResult.wrong("Your script did not output expected information about " +
+                            "removing *.tmp files at " + path);
         } catch (IOException e) {
             return CheckResult.wrong("Error happened during testing: " + e.getMessage());
         }
+    }
 
+    private CheckResult isPyCleanReportOk(List<String> cleanReport, String path) {
         var scriptsDir = path.isBlank() ? "." + "/py_scripts" : path + "/py_scripts";
         var scriptsPath = Paths.get(scriptsDir);
         if (!Files.exists(scriptsPath)) {
@@ -413,11 +473,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
         // todo check if py files are moved to a sub-dir
         return CheckResult.correct();
-
-        // todo check if reported number of files correspond to the actual processed number
     }
-
-    // TODO: 7/26/22 check if script does not create /py_scripts dir when there is no py files
 
     private CheckResult checkInfo(List<String> infoLines) {
         boolean hasLineOne = infoLines.stream()
@@ -545,24 +601,19 @@ public class FileJanitorStage5Test extends StageTest<Object> {
         }
     }
 
+    private List<String> getFilenamesToReport() {
+        return List.of("file.tmp", "File.tmp", ".File-1.tmp", "test/.tricky.log.tmp",
+                "logfile.log", ".hidden-log-file", "test/.hidden-Tricky.log.file.log",
+                "python-script.py", "test/another-one.py");
+    }
+
     private Map<String, String> getFilesToReport() {
-        return Map.of(
-                "file.tmp", getRandomFileContent(),
-                "File.tmp", getRandomFileContent(),
-                ".File-1.tmp", getRandomFileContent(),
-                "test/.tricky.log.tmp", getRandomFileContent(),
-                "logfile.log", getRandomFileContent(),
-                ".hidden-log-file", getRandomFileContent(),
-                "test/.hidden-Tricky.log.file.log", getRandomFileContent(),
-                "python-script.py", getRandomFileContent(),
-                "test/another-one.py", getRandomFileContent()
-        );
+        return getFilenamesToReport().stream()
+                .collect(Collectors.toMap(name -> name, name -> getRandomFileContent()));
     }
 
     private List<String> getFilenamesByExtExclPath(String path, String extension) {
-        return List.of("file.tmp", "File.tmp", ".File-1.tmp", "test/.tricky.log.tmp",
-                        "logfile.log", ".hidden-log-file", "test/.hidden-Tricky.log.file.log",
-                        "python-script.py", "test/another-one.py").stream()
+        return getFilenamesToReport().stream()
                 .filter(it -> {
                     if (path.isBlank()) {
                         return !it.startsWith("test/");

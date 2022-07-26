@@ -103,7 +103,7 @@ compress_logs() {
     echo -n "Compressing log files..."
 
     if [ "$total_logs" -gt 0 ]; then
-        tar cvzf "$1"/logs.tar.gz ./*.log 2>/dev/null
+        tar cvzf "$1"/logs.tar.gz ./*.log 2>&1>/dev/null
         find "$1" -maxdepth 1 -name "*.log" -exec rm {} \;
     fi
 
@@ -133,7 +133,7 @@ move_py_scripts() {
         find "$1" -maxdepth 1 -name "*.py" -exec mv {} "$1/py_scripts" \;
     fi
 
-    echo "  done! $total_py have been moved"
+    echo "  done! $total_py files have been moved"
 
     if [[ $dir_exists -eq 0 ]]; then
         rmdir "$1/py_scripts" 2>/dev/null
