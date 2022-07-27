@@ -80,7 +80,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
     private final String currentDirCleanDone = "Clean up of the current directory is complete!";
     private final String someDirCleanDone = "Clean up of %s is complete!";
     private final String cleanLineFormat = "(?).+ done! %d files have been %s";
-    private final String[] pathsToClean = { "./", "./test" };
+    private final String[] pathsToClean = {"./", "./test"};
 
     @DynamicTest(order = 1)
     CheckResult testScriptTitle() {
@@ -541,7 +541,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
             }
 
             var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
-            var logFiles = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log");
+            var logFiles = getFilenamesByExtExclPath(path, "log");
 
             try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(archFilename));
                  TarArchiveInputStream tais = new TarArchiveInputStream(gzis)) {
@@ -554,7 +554,8 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 }
 
                 if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
-                    return CheckResult.wrong("Expected " + logFiles + " but found " + compressedFiles);
+                    return CheckResult.wrong("The actual content of logs.tar.gz is not as expected. " +
+                            "Expected: " + logFiles + " but found " + compressedFiles);
                 }
 
                 var expectedCount = getFilenamesByExtExclPath(path, "log").size();
@@ -575,32 +576,32 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private CheckResult isPyCleanReportOk(List<String> cleanReport, String path) {
         try {
-        var scriptsDir = path.isBlank() ? "./py_scripts" : path + "/py_scripts";
-        var scriptsPath = Paths.get(scriptsDir);
-        if (!Files.exists(scriptsPath)) {
-            return CheckResult.wrong(scriptsDir + " is not found");
-        } else if (!scriptsPath.toFile().isDirectory()) {
-            return CheckResult.wrong(scriptsDir + "is not a directory");
-        }
+            var scriptsDir = path.isBlank() ? "./py_scripts" : path + "/py_scripts";
+            var scriptsPath = Paths.get(scriptsDir);
+            if (!Files.exists(scriptsPath)) {
+                return CheckResult.wrong(scriptsDir + " is not found");
+            } else if (!scriptsPath.toFile().isDirectory()) {
+                return CheckResult.wrong(scriptsDir + "is not a directory");
+            }
 
-        var pyActualCountAtSourcePath = getFileSizeAndCount(path, "py").get("count");
-        if (pyActualCountAtSourcePath != 0L) {
-            return CheckResult.wrong("Your script didn't move all *.py files to " + scriptsDir);
-        }
+            var pyActualCountAtSourcePath = getFileSizeAndCount(path, "py").get("count");
+            if (pyActualCountAtSourcePath != 0L) {
+                return CheckResult.wrong("Your script didn't move all *.py files to " + scriptsDir);
+            }
 
-        var pyActualCountAtTargetPath = getFileSizeAndCount(scriptsDir, "py").get("count");
-        var expectedCount = getFilenamesByExtExclPath(path, "py").size();
-        if (pyActualCountAtTargetPath != (long) expectedCount) {
-            return CheckResult.wrong("Not all *.py files are present in " + scriptsDir);
-        }
+            var pyActualCountAtTargetPath = getFileSizeAndCount(scriptsDir, "py").get("count");
+            var expectedCount = getFilenamesByExtExclPath(path, "py").size();
+            if (pyActualCountAtTargetPath != (long) expectedCount) {
+                return CheckResult.wrong("Not all *.py files are present in " + scriptsDir);
+            }
 
-        var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
-        var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
+            var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
+            var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
 
-        return isPyReportOk ?
-                CheckResult.correct() :
-                CheckResult.wrong("Your script did not output expected information about " +
-                        "moving *.py files at " + path);
+            return isPyReportOk ?
+                    CheckResult.correct() :
+                    CheckResult.wrong("Your script did not output expected information about " +
+                            "moving *.py files at " + path);
         } catch (Exception e) {
             return CheckResult.wrong("Error happened during testing: " + e.getMessage());
         }
