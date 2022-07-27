@@ -541,7 +541,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
             }
 
             var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
-            var logFiles = getFilenamesByExtExclPath(path.startsWith("/") ? path : "", "log");
+            var logFiles = getFilenamesByExtExclPath(path, "log");
 
             try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(archFilename));
                  TarArchiveInputStream tais = new TarArchiveInputStream(gzis)) {
@@ -554,7 +554,8 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 }
 
                 if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
-                    return CheckResult.wrong("Expected " + logFiles + " but found " + compressedFiles);
+                    return CheckResult.wrong("The actual content of logs.tar.gz is not as expected. " +
+                            "Expected: " + logFiles + " but found " + compressedFiles);
                 }
 
                 var expectedCount = getFilenamesByExtExclPath(path, "log").size();
