@@ -549,7 +549,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 List<String> compressedFiles = new ArrayList<>();
 
                 while ((entry = tais.getNextEntry()) != null) {
-                    var entryName = entry.getName().replaceFirst("\\./", "");
+                    var entryName = entry.getName().replaceFirst("\\./+", "");
                     compressedFiles.add(entryName);
                 }
 
@@ -748,7 +748,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private List<String> getFilenamesToReport() {
         return List.of("file.tmp", "File.tmp", ".File-1.tmp", "test/.tricky.log.tmp",
-                "logfile.log", ".hidden-log-file", "test/.hidden-Tricky.log.file.log",
+                "logfile.log", ".hidden-log-file", "test/Strange.log.file.log",
                 "python-script.py", "test/another-one.py");
     }
 
