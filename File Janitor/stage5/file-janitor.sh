@@ -103,8 +103,8 @@ compress_logs() {
     echo -n "Compressing log files..."
 
     if [ "$total_logs" -gt 0 ]; then
-        tar cvzf "$1"/logs.tar.gz "$1"/*.log 2>&1>/dev/null
-        find "$1" -maxdepth 1 -name "*.log" -exec rm {} \;
+        zip -r "$1"/logs.zip "$1"/*.log 2>&1>/dev/null
+         find "$1" -maxdepth 1 -name "*.log" -exec rm {} \;
     fi
 
     echo "  done! $total_logs files have been compressed"

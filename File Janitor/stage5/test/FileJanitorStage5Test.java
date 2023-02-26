@@ -1,5 +1,3 @@
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.hyperskill.hstest.dynamic.DynamicTest;
 import org.hyperskill.hstest.stage.StageTest;
 import org.hyperskill.hstest.testcase.CheckResult;
@@ -12,16 +10,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.hyperskill.hstest.testing.expect.Expectation.expect;
 
@@ -365,7 +360,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
         var checkResult = checkCleanReport(cleanReport, path);
 
-        deleteUserGenFiles("./py_scripts", "logs.tar.gz");
+        deleteUserGenFiles("./py_scripts", "logs.zip");
 
         return checkResult;
     }
@@ -391,7 +386,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
         var checkResult = checkCleanReport(cleanReport, path);
 
-        deleteUserGenFiles(path + "/py_scripts", path + "/logs.tar.gz");
+        deleteUserGenFiles(path + "/py_scripts", path + "/logs.zip");
 
         return checkResult;
     }
@@ -540,21 +535,24 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                         "directory, but " + logActualCount + " files were found");
             }
 
-            var archFilename = path.isBlank() ? "logs.tar.gz" : path + "/logs.tar.gz";
+            var archFilename = path.isBlank() ? "logs.zip" : path + "/logs.zip";
             var logFiles = getFilenamesByExtExclPath(path, "log");
 
-            try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(archFilename));
-                 TarArchiveInputStream tais = new TarArchiveInputStream(gzis)) {
-                ArchiveEntry entry;
+            try (ZipInputStream zis = new ZipInputStream(new FileInputStream(archFilename))) {
+                ZipEntry zipEntry = zis.getNextEntry();
                 List<String> compressedFiles = new ArrayList<>();
 
-                while ((entry = tais.getNextEntry()) != null) {
-                    var entryName = entry.getName().replaceFirst("\\./+", "");
+                while (zipEntry != null) {
+                    var entryName = zipEntry.getName();
+                    if (entryName.startsWith("/")) {
+                        entryName = entryName.substring(1);
+                    }
                     compressedFiles.add(entryName);
+                    zipEntry = zis.getNextEntry();
                 }
 
                 if (!compressedFiles.containsAll(logFiles) || !logFiles.containsAll(compressedFiles)) {
-                    return CheckResult.wrong("The actual content of logs.tar.gz is not as expected. " +
+                    return CheckResult.wrong("The actual content of logs.zip is not as expected. " +
                             "Expected: " + logFiles + " but found " + compressedFiles);
                 }
 

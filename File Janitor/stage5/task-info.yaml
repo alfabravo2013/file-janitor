@@ -2,3 +2,5 @@ type: edu
 files:
 - name: file-janitor.sh
   visible: true
+- name: logs.zip
+  visible: true
