@@ -255,6 +255,10 @@ public class FileJanitorStage4Test extends StageTest<Object> {
                 .filter(line -> !line.isBlank())
                 .collect(Collectors.toList());
 
+        if (fileReport.size() != 3) {
+            return CheckResult.wrong("Your file report must contain 1 line per each file type (3 in total)");
+        }
+
         return checkFileReport(fileReport, path);
     }
 
@@ -281,6 +285,10 @@ public class FileJanitorStage4Test extends StageTest<Object> {
                 .skip(1)
                 .filter(line -> !line.isBlank())
                 .collect(Collectors.toList());
+
+        if (fileReport.size() != 3) {
+            return CheckResult.wrong("Your file report must contain 1 line per each file type (3 in total)");
+        }
 
         return checkFileReport(fileReport, path);
     }
@@ -389,20 +397,20 @@ public class FileJanitorStage4Test extends StageTest<Object> {
     }
 
     private CheckResult checkFileReport(List<String> report, String path) {
-        Map<String, Long> actualTmp = getFileSizeAndCount(path, "tmp");
-        Map<String, Long> actualLog = getFileSizeAndCount(path, "log");
-        Map<String, Long> actualPy = getFileSizeAndCount(path, "py");
+        Map<String, Long> expectedTmp = getFileSizeAndCount(path, "tmp");
+        Map<String, Long> expectedLog = getFileSizeAndCount(path, "log");
+        Map<String, Long> expectedPy = getFileSizeAndCount(path, "py");
 
-        long tmpActualSize = actualTmp.get("size");
-        long tmpActualCount = actualTmp.get("count");
-        long logActualSize = actualLog.get("size");
-        long logActualCount = actualLog.get("count");
-        long pyActualSize = actualPy.get("size");
-        long pyActualCount = actualPy.get("count");
+        long tmpExpectedSize = expectedTmp.get("size");
+        long tmpExpectedCount = expectedTmp.get("count");
+        long logExpectedSize = expectedLog.get("size");
+        long logExpectedCount = expectedLog.get("count");
+        long pyExpectedSize = expectedPy.get("size");
+        long pyExpectedCount = expectedPy.get("count");
 
-        Pattern tmpPattern = Pattern.compile(String.format(reportLineFormat, tmpActualCount, "tmp", tmpActualSize));
-        Pattern logPattern = Pattern.compile(String.format(reportLineFormat, logActualCount, "log", logActualSize));
-        Pattern pyPattern = Pattern.compile(String.format(reportLineFormat, pyActualCount, "py", pyActualSize));
+        Pattern tmpPattern = Pattern.compile(String.format(reportLineFormat, tmpExpectedCount, "tmp", tmpExpectedSize));
+        Pattern logPattern = Pattern.compile(String.format(reportLineFormat, logExpectedCount, "log", logExpectedSize));
+        Pattern pyPattern = Pattern.compile(String.format(reportLineFormat, pyExpectedCount, "py", pyExpectedSize));
 
         boolean isTmpReportOk = report.stream().anyMatch(line -> tmpPattern.matcher(line).matches());
         boolean isLogReportOk = report.stream().anyMatch(line -> logPattern.matcher(line).matches());
@@ -410,17 +418,17 @@ public class FileJanitorStage4Test extends StageTest<Object> {
 
         if (!isTmpReportOk) {
             return CheckResult.wrong("Your script outputs an incorrect report for tmp files at "
-                    + path + ": the actual count was " + tmpActualCount + " and actual size was " + tmpActualSize);
+                    + path + ": expected count is " + tmpExpectedCount + " and expected size is " + tmpExpectedSize);
         }
 
         if (!isLogReportOk) {
             return CheckResult.wrong("Your script outputs an incorrect report for log files at "
-                    + path + ": the actual count was " + logActualCount + " and actual size was " + logActualSize);
+                    + path + ": expected count is " + logExpectedCount + " and expected size is " + logExpectedSize);
         }
 
         if (!isPyReportOk) {
             return CheckResult.wrong("Your script outputs an incorrect report for py files at "
-                    + path + ": the actual count was " + pyActualCount + " and actual size was " + pyActualSize);
+                    + path + ": expected count is " + pyExpectedCount + " and expected size is " + pyExpectedSize);
         }
 
         return CheckResult.correct();

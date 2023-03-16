@@ -75,7 +75,7 @@ public class FileJanitorStage5Test extends StageTest<Object> {
     private final String currentDirCleanDone = "Clean up of the current directory is complete!";
     private final String someDirCleanDone = "Clean up of %s is complete!";
     private final String cleanLineFormat = "(?).+ done! %d files have been %s";
-    private final String[] pathsToClean = {"./", "./test"};
+    private final String[] pathsToClean = { "./", "./test" };
 
     @DynamicTest(order = 1)
     CheckResult testScriptTitle() {
@@ -266,6 +266,10 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .filter(line -> !line.isBlank())
                 .collect(Collectors.toList());
 
+        if (fileReport.size() != 3) {
+            return CheckResult.wrong("Your file report must contain 1 line per each file type (3 in total)");
+        }
+
         return checkFileReport(fileReport, path);
     }
 
@@ -292,6 +296,10 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .skip(1)
                 .filter(line -> !line.isBlank())
                 .collect(Collectors.toList());
+
+        if (fileReport.size() != 3) {
+            return CheckResult.wrong("Your file report must contain 1 line per each file type (3 in total)");
+        }
 
         return checkFileReport(fileReport, path);
     }
@@ -358,6 +366,10 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .takeWhile(it -> !currentDirCleanDone.equalsIgnoreCase(it))
                 .collect(Collectors.toList());
 
+        if (cleanReport.size() != 3) {
+            return CheckResult.wrong("Your clean report must contain 1 line per each file type (3 in total)");
+        }
+
         var checkResult = checkCleanReport(cleanReport, path);
 
         deleteUserGenFiles("./py_scripts", "logs.zip");
@@ -383,6 +395,10 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .filter(line -> !line.isBlank())
                 .takeWhile(it -> !someDirCleanDone.formatted(path).equalsIgnoreCase(it))
                 .collect(Collectors.toList());
+
+        if (cleanReport.size() != 3) {
+            return CheckResult.wrong("Your clean report must contain 1 line per each file type (3 in total)");
+        }
 
         var checkResult = checkCleanReport(cleanReport, path);
 
@@ -450,8 +466,12 @@ public class FileJanitorStage5Test extends StageTest<Object> {
                 .dropWhile(line -> !currentDirCleanMsg.equalsIgnoreCase(line.strip()))
                 .skip(1)
                 .filter(line -> !line.isBlank())
-                .takeWhile(it -> !currentDirCleanMsg.equalsIgnoreCase(it))
+                .takeWhile(it -> !currentDirCleanDone.equalsIgnoreCase(it))
                 .collect(Collectors.toList());
+
+        if (cleanReport.size() != 3) {
+            return CheckResult.wrong("Your clean report must contain 1 line per each file type (3 in total)");
+        }
 
         var expectedCount = 0;
 
@@ -574,32 +594,32 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private CheckResult isPyCleanReportOk(List<String> cleanReport, String path) {
         try {
-            var scriptsDir = path.isBlank() ? "./py_scripts" : path + "/py_scripts";
-            var scriptsPath = Paths.get(scriptsDir);
-            if (!Files.exists(scriptsPath)) {
-                return CheckResult.wrong(scriptsDir + " is not found");
-            } else if (!scriptsPath.toFile().isDirectory()) {
-                return CheckResult.wrong(scriptsDir + "is not a directory");
-            }
+        var scriptsDir = path.isBlank() ? "./py_scripts" : path + "/py_scripts";
+        var scriptsPath = Paths.get(scriptsDir);
+        if (!Files.exists(scriptsPath)) {
+            return CheckResult.wrong(scriptsDir + " is not found");
+        } else if (!scriptsPath.toFile().isDirectory()) {
+            return CheckResult.wrong(scriptsDir + "is not a directory");
+        }
 
-            var pyActualCountAtSourcePath = getFileSizeAndCount(path, "py").get("count");
-            if (pyActualCountAtSourcePath != 0L) {
-                return CheckResult.wrong("Your script didn't move all *.py files to " + scriptsDir);
-            }
+        var pyActualCountAtSourcePath = getFileSizeAndCount(path, "py").get("count");
+        if (pyActualCountAtSourcePath != 0L) {
+            return CheckResult.wrong("Your script didn't move all *.py files to " + scriptsDir);
+        }
 
-            var pyActualCountAtTargetPath = getFileSizeAndCount(scriptsDir, "py").get("count");
-            var expectedCount = getFilenamesByExtExclPath(path, "py").size();
-            if (pyActualCountAtTargetPath != (long) expectedCount) {
-                return CheckResult.wrong("Not all *.py files are present in " + scriptsDir);
-            }
+        var pyActualCountAtTargetPath = getFileSizeAndCount(scriptsDir, "py").get("count");
+        var expectedCount = getFilenamesByExtExclPath(path, "py").size();
+        if (pyActualCountAtTargetPath != (long) expectedCount) {
+            return CheckResult.wrong("Not all *.py files are present in " + scriptsDir);
+        }
 
-            var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
-            var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
+        var pyPattern = Pattern.compile(String.format(cleanLineFormat, expectedCount, "moved"));
+        var isPyReportOk = cleanReport.stream().anyMatch(line -> pyPattern.matcher(line).matches());
 
-            return isPyReportOk ?
-                    CheckResult.correct() :
-                    CheckResult.wrong("Your script did not output expected information about " +
-                            "moving *.py files at " + path);
+        return isPyReportOk ?
+                CheckResult.correct() :
+                CheckResult.wrong("Your script did not output expected information about " +
+                        "moving *.py files at " + path);
         } catch (Exception e) {
             return CheckResult.wrong("Error happened during testing: " + e.getMessage());
         }
@@ -680,20 +700,20 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
     private CheckResult checkFileReport(List<String> report, String path) {
         try {
-            var actualTmp = getFileSizeAndCount(path, "tmp");
-            var actualLog = getFileSizeAndCount(path, "log");
-            var actualPy = getFileSizeAndCount(path, "py");
+            var expectedTmp = getFileSizeAndCount(path, "tmp");
+            var expectedLog = getFileSizeAndCount(path, "log");
+            var expectedPy = getFileSizeAndCount(path, "py");
 
-            var tmpActualSize = actualTmp.get("size");
-            var tmpActualCount = actualTmp.get("count");
-            var logActualSize = actualLog.get("size");
-            var logActualCount = actualLog.get("count");
-            var pyActualSize = actualPy.get("size");
-            var pyActualCount = actualPy.get("count");
+            var tmpExpectedSize = expectedTmp.get("size");
+            var tmpExpectedCount = expectedTmp.get("count");
+            var logExpectedSize = expectedLog.get("size");
+            var logExpectedCount = expectedLog.get("count");
+            var pyExpectedSize = expectedPy.get("size");
+            var pyExpectedCount = expectedPy.get("count");
 
-            var tmpPattern = Pattern.compile(String.format(reportLineFormat, tmpActualCount, "tmp", tmpActualSize));
-            var logPattern = Pattern.compile(String.format(reportLineFormat, logActualCount, "log", logActualSize));
-            var pyPattern = Pattern.compile(String.format(reportLineFormat, pyActualCount, "py", pyActualSize));
+            var tmpPattern = Pattern.compile(String.format(reportLineFormat, tmpExpectedCount, "tmp", tmpExpectedSize));
+            var logPattern = Pattern.compile(String.format(reportLineFormat, logExpectedCount, "log", logExpectedSize));
+            var pyPattern = Pattern.compile(String.format(reportLineFormat, pyExpectedCount, "py", pyExpectedSize));
 
             var isTmpReportOk = report.stream().anyMatch(line -> tmpPattern.matcher(line).matches());
             var isLogReportOk = report.stream().anyMatch(line -> logPattern.matcher(line).matches());
@@ -701,17 +721,17 @@ public class FileJanitorStage5Test extends StageTest<Object> {
 
             if (!isTmpReportOk) {
                 return CheckResult.wrong("Your script outputs an incorrect report for tmp files at "
-                        + path + ": the actual count was " + tmpActualCount + " and actual size was " + tmpActualSize);
+                        + path + ": expected count is " + tmpExpectedCount + " and expected size is " + tmpExpectedSize);
             }
 
             if (!isLogReportOk) {
                 return CheckResult.wrong("Your script outputs an incorrect report for log files at "
-                        + path + ": the actual count was " + logActualCount + " and actual size was " + logActualSize);
+                        + path + ": expected count is " + logExpectedCount + " and expected size is " + logExpectedSize);
             }
 
             if (!isPyReportOk) {
                 return CheckResult.wrong("Your script outputs an incorrect report for py files at "
-                        + path + ": the actual count was " + pyActualCount + " and actual size was " + pyActualSize);
+                        + path + ": expected count is " + pyExpectedCount + " and expected size is " + pyExpectedSize);
             }
 
             return CheckResult.correct();
